@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    夜眠息屏：权限刻意最小化（PRD 7.2）。
+    没有网络、相机、麦克风、存储、位置、通讯录；也不申请精确闹钟（SCHEDULE_EXACT_ALARM）。
+
+    M0/M1 落地的是「授权 + 息屏 + 常驻服务」这条竖切：设备管理员、一键解除、
+    设置持久化、前台服务与常驻通知。
+    开机自启（RECEIVE_BOOT_COMPLETED）与无障碍备选通道分别在 M3 / P1 加入。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        前台服务三件套。缺任何一条，startForeground() 在 API 34 上都会直接抛：
+         - 基础权限（API 28+ 必需）
+         - API 34 起按类型申请的配套权限
+         - 清单里的 foregroundServiceType + PROPERTY_SPECIAL_USE_FGS_SUBTYPE（见下方 service）
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!--
+        常驻通知（Android 13+ 需运行时申请）。
+        **本应用刻意不申请它。** 状态文字与预警已经搬到悬浮窗，通知只剩「前台服务的
+        系统凭据」这一个用途；而在 Android 13+ 上，没有通知权限的 App 通知默认关闭，
+        于是这条凭据不会出现在通知栏里——这正是「关掉通知栏」的实现方式，
+        而不是靠压渠道档位去躲（MIUI 会把任何档位的常驻通知都折进「更多通知」）。
+
+        权限声明保留：用户若想手动打开通知，设置页里得先有这么一项。
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        状态悬浮窗（显示在其他应用上层）。
+        这是「特殊权限」：只能用 Intent 把用户送到系统页手动开，App 无法自己申请。
+        没这个权限时服务照常跑、息屏照常触发，只是过程不可见。
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!--
+        开机自启（PRD F14 / D2，已从 P1 提到 P0）。
+        这是「设置一次就不用管」唯一的缺口：服务被系统回收有 START_STICKY 兜底，
+        从最近任务划掉也不会死，但**重启手机是全部清零**。没有这个权限，
+        用户重启一次功能就静默失效，而界面照样显示「监测已开启」。
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.NightDoze">
+
+        <!--
+            设备管理员：唯一用途是调用 DevicePolicyManager.lockNow() 强制锁屏。
+            对应的 res/xml/device_admin.xml 里**只声明 <force-lock />**，
+            不含 wipe-data / reset-password / disable-camera。label/description 里说的
+            「不具备擦除数据能力」必须与那份声明严格一致（PRD 7.10 / D8）。
+        -->
+        <receiver
+            android:name=".admin.NightDozeAdminReceiver"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:description="@string/admin_description"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            开机自启接收器（PRD F14 / D2）。
+
+            为什么必须有它：Android 12 起禁止 App 在后台自己启动前台服务，
+            例外名单里只有「开机完成 / 应用更新完成 / 用户点了界面」这几种。
+            所以「重启后服务自己回来」只能靠系统在开机时来敲这个门。
+
+            实际做事的只有两件：
+              1. 读一次总开关 + 查一次设备管理员授权（都满足才拉起服务）
+              2. 拉起监测服务
+
+            `exported="true"` 是系统广播所必需（系统在 App 外部发这条广播），
+            但接收器内部不做任何外部可控的事：不解析 Intent 里的数据、
+            不接受参数、只做上述两件事，所以不构成暴露面。
+            `directBootAware` 保持默认 false：DataStore 在用户解锁前不可读，
+            因此 LOCKED_BOOT_COMPLETED 分支实际会读设置超时而安静退出，
+            真正的启动由解锁后的 BOOT_COMPLETED 完成（见 BootReceiver 注释）。
+        -->
+        <receiver
+            android:name=".boot.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            常驻监测服务（PRD 7.10）。
+            `specialUse` 这个类型值 API 34 才引入，低版本系统会忽略它；用 tools:targetApi
+            抑制 minSdk 26 下「此属性需要 API 34」的 lint 告警。
+            `stopWithTask="false"`：用户从最近任务划掉 App 时，服务跟着一起活。这正是 AC6 的判据。
+            （任务移除本身只回调 onTaskRemoved()，并不会停掉 Service，这条是显式把语义钉住。）
+        -->
+        <service
+            android:name=".engine.MonitorService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="34">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="screen_idle_auto_sleep" />
+        </service>
+
+        <!--
+            锁定竖屏：单页 + 大状态环，横屏没有收益，只增加适配与出错面（PRD 5.5）。
+            configChanges 保留 uiMode，深浅色切换不重建 Activity。
+
+            `excludeFromRecents="true"`：本应用不出现在最近任务里。
+            理由与 AC6 同源：这是个「设置一次就不用管」的后台工具，唯一的界面只是配置页。
+            它出现在最近任务里没有用处，却给了用户一个**误杀的入口**——在 MIUI/HyperOS 上
+            划掉卡片会连带清理后台（`stopWithTask` 只保证 Service 不随任务移除而停止，
+            管不住厂商的清理策略）。不给这个入口，就没有这次误杀。
+        -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:configChanges="uiMode"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

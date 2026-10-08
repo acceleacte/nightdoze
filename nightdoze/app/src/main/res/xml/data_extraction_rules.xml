@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    云备份全关（PRD 7.9 / D1）。
+
+    这是「零联网、零数据外传」承诺的一部分：Android 默认会把 DataStore / SharedPreferences
+    自动备份到用户的 Google Drive，用户会看到本 App 的数据出现在云上。那与承诺矛盾，
+    即便这次传输是系统发起的。
+
+    应用清单里同时写着 allowBackup="false" 与 fullBackupContent="false"，
+    那是给 API ≤ 30 用的；本文件覆盖 API 31+。三处一起写才是完整的。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

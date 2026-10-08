@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Compose 只借用这个主题做「Compose 接管前那一帧」的窗口底色。
+    真机是 Android 16，targetSdk 34 不触发强制 edge-to-edge，故系统栏显式设透明。
+    底色必须与 values-night 成对：这是个夜里用的 App，启动闪一下白屏最刺眼。
+-->
+<resources>
+    <style name="Theme.NightDoze" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFF7F9FC</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

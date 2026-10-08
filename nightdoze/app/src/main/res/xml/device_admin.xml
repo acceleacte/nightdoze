@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    **只声明 force-lock 一项**（PRD 7.10 / D8）。
+
+    这里每加一条策略，用户在系统授权页看到的权限含义就变一次，而 App 内说明文案
+    （strings.xml 的 admin_description）也必须跟着改。删掉的策略会让已授权的老用户
+    在下次打开时被系统要求重新授权。
+
+    明确不声明、也不打算声明：
+      wipe-data            擦除全部数据
+      reset-password       重置锁屏密码
+      disable-camera       禁用相机
+      force-lock 以外的一切
+
+    换句话说：即使这份 App 被恶意利用，它也只能做一件用户本来按一下电源键就能做的事。
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

@@ -1,0 +1,8 @@
+# 统一行尾：本仓库在 Windows 上开发，但脚本要能在 bash 下直接跑。
+# 不写这一条时，core.autocrlf 会在 checkout 时把 gradlew / build_install.sh 换成 CRLF，
+# 克隆到别的机器上就会以 "bad interpreter" 报错。
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.apk binary
+*.png binary

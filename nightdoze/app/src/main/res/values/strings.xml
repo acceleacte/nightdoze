@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">夜眠息屏</string>
+
+    <!--
+        设备管理员授权页上的说明（PRD R4）。
+        这段文案必须与 res/xml/device_admin.xml 里声明的策略严格一致：
+        那里只有 <force-lock />，所以这里才敢写「不具备擦除数据的能力」。
+        改任一处都要同步改另一处。
+    -->
+    <string name="admin_description">仅用于在长时间无人操作后强制锁屏（息屏）。不能擦除数据、重置密码、锁定设备或禁用相机。</string>
+
+    <!-- 用户在系统设置里点「取消激活」时，系统弹窗里显示的提示 -->
+    <string name="admin_disable_warning">取消授权后，夜眠息屏立即停止工作，屏幕不会再被自动熄灭。已保存的设置会保留，重新授权即可继续。</string>
+
+    <string name="channel_monitor">监测状态</string>
+    <string name="notif_title">夜眠息屏</string>
+    <string name="notif_ready">监测中 · 长时间无人操作将自动息屏</string>
+
+    <!--
+        悬浮窗文案（引擎侧，非界面）。一行、尽量短：它是飘在别人的应用上面的。
+        界面上那一整套说法（状态环 + 说明）在 MainScreen 里，只有分不开的半句才放这里。
+    -->
+    <string name="overlay_monitoring">已静止 %1$s</string>
+    <string name="overlay_pending_fire">即将息屏 · 连续动几秒取消</string>
+    <string name="overlay_paused">已暂停 · 至 %1$s</string>
+    <string name="overlay_screen_off">屏幕已熄</string>
+    <string name="overlay_out_of_schedule">不在生效时段</string>
+    <string name="overlay_needs_charging">等插上电源</string>
+    <string name="overlay_ready">守夜中</string>
+</resources>
